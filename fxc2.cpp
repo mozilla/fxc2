@@ -1,6 +1,3 @@
-// fxc2.cpp : Defines the entry point for the console application.
-//
-
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
 #include <direct.h>
@@ -178,8 +175,12 @@ int main(int argc, char* argv[])
   // Shader Compilation
 
   HMODULE h = LoadLibrary("d3dcompiler_47.dll");
-  pCompileFromFileg ptr = (pCompileFromFileg)GetProcAddress(h, "D3DCompileFromFile");
+  if(h == NULL) {
+    printf("Error: could not load d3dcompiler_47.dll - is it in the fxc2 directory?\n");
+    return 1;
+  }
 
+  pCompileFromFileg ptr = (pCompileFromFileg)GetProcAddress(h, "D3DCompileFromFile");
   if(ptr == NULL) {
     printf("Error: could not get the address of D3DCompileFromFile.\n");
     return 1;
