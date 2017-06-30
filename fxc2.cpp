@@ -174,9 +174,21 @@ int main(int argc, char* argv[])
   // ====================================================================================
   // Shader Compilation
 
-  HMODULE h = LoadLibrary("d3dcompiler_47.dll");
+  //Find the WINDOWS dll
+  char dllPath[ MAX_PATH ];
+  int bytes = GetModuleFileName(NULL, dllPath, MAX_PATH);
+  if(bytes == 0) {
+    printf("Could not retrieve the directory of the running executable.\n");
+    return 1;
+  }
+  //Fill rest of the buffer with NULLs
+  memset(dllPath + bytes, '\0', MAX_PATH - bytes);
+  //Copy the dll location over top fxc2.exe
+  strcpy(strrchr(dllPath, '\\') + 1, "d3dcompiler_47.dll");
+  
+  HMODULE h = LoadLibrary(dllPath);
   if(h == NULL) {
-    printf("Error: could not load d3dcompiler_47.dll - is it in the fxc2 directory?\n");
+    printf("Error: could not load d3dcompiler_47.dll from %s\n", dllPath);
     return 1;
   }
 
@@ -243,10 +255,10 @@ int main(int argc, char* argv[])
   if (FAILED(hr)) {
    if (errors) {
     char* error = (char*)errors->GetBufferPointer();
-    printf("Got an error while compiling:\n%s\n", error);
+    printf("Got an error (%i) while compiling:\n%s\n", hr, error);
     errors->Release();
    } else {
-    printf("Got an error while compiling, but no error message.\n");
+     printf("Got an error (%i) while compiling, but no error message.\n", hr);
    }
 
    if (output)
