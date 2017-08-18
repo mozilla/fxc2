@@ -272,7 +272,7 @@ int main(int argc, char* argv[])
     FILE* f;
     errno_t err = fopen_s(&f, outputFile, "w");
 
-    fprintf(f, "const BYTE %s[] =\n{\n", entryPoint);
+    fprintf(f, "const signed char %s[] =\n{\n", entryPoint);
     for (i = 0; i < len; i++) {
      fprintf(f, "%4i", outString[i]);
      if (i != len - 1)
@@ -281,7 +281,7 @@ int main(int argc, char* argv[])
        fprintf(f, "\n");
     }
 
-    fprintf(f, "\n};");
+    fprintf(f, "\n};\n");
     fclose(f);
 
     if(verbose) {
