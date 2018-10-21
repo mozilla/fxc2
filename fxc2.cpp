@@ -3,7 +3,8 @@
 #include <direct.h>
 #include <stdio.h>
 #include <getopt.h>
-#include <string.h>
+#include <string>
+#include <wchar.h>
 
 
 #define D3D_COMPILE_STANDARD_FILE_INCLUDE ((ID3DInclude*)(UINT_PTR)1)
@@ -258,7 +259,14 @@ int main(int argc, char* argv[])
     printf("Got an error (%i) while compiling:\n%s\n", hr, error);
     errors->Release();
    } else {
-     printf("Got an error (%i) while compiling, but no error message.\n", hr);
+     printf("Got an error (%i) while compiling, but no error message from the function.\n", hr);
+
+     LPSTR messageBuffer = nullptr;
+     size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                 NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+     std::string message(messageBuffer, size);
+     LocalFree(messageBuffer);
+     printf("Windows Error Message: %s\n", messageBuffer);
    }
 
    if (output)
