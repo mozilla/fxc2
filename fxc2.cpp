@@ -18,6 +18,29 @@ typedef HRESULT(__stdcall *pCompileFromFileg)(LPCWSTR,
 					      ID3DBlob**,
 					      ID3DBlob**);
 
+struct ProfilePrefix {
+  const char* name;
+  const char* prefix;
+};
+
+static const ProfilePrefix g_profilePrefixTable[] = {
+  { "ps_2_0", "g_ps20"},
+  { "ps_2_a", "g_ps21"},
+  { "ps_2_b", "g_ps21"},
+  { "ps_2_sw", "g_ps2ff"},
+  { "ps_3_0", "g_ps30"},
+  { "ps_3_sw", "g_ps3ff"},
+
+  { "vs_1_1", "g_vs11"},
+  { "vs_2_0", "g_vs20"},
+  { "vs_2_a", "g_vs21"},
+  { "vs_2_sw", "g_vs2ff"},
+  { "vs_3_0", "g_vs30"},
+  { "vs_3_sw", "g_vs3ff"},
+
+  { NULL, NULL}
+};
+
 void print_usage_arg() {
   // https://msdn.microsoft.com/en-us/library/windows/desktop/bb509709(v=vs.85).aspx
   printf("You have specified an argument that is not handled by fxc2\n");
@@ -167,10 +190,21 @@ int main(int argc, char* argv[])
     print_usage_missing("entryPoint");
   if(defines == NULL)
     print_usage_missing("defines");
-  if(variableName == NULL)
-    print_usage_missing("variableName");
   if(outputFile == NULL)
     print_usage_missing("outputFile");
+
+  //Default output variable name
+  if (variableName == NULL) {
+      const char* prefix = "g";
+      for (int i = 0; g_profilePrefixTable[i].name != NULL; i++) {
+          if (strcmp(g_profilePrefixTable[i].name, model) == 0) {
+              prefix = g_profilePrefixTable[i].prefix;
+              break;
+          }
+      }
+      variableName = (char*)malloc(strlen(prefix) + strlen(entryPoint) + 2);
+      sprintf(variableName, "%s_%s", prefix, entryPoint);
+  }
 
   // ====================================================================================
   // Shader Compilation
@@ -280,7 +314,7 @@ int main(int argc, char* argv[])
     FILE* f;
     errno_t err = fopen_s(&f, outputFile, "w");
 
-    fprintf(f, "const signed char %s[] =\n{\n", entryPoint);
+    fprintf(f, "const signed char %s[] =\n{\n", variableName);
     for (i = 0; i < len; i++) {
      fprintf(f, "%4i", outString[i]);
      if (i != len - 1)
