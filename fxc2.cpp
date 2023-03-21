@@ -6,7 +6,6 @@
 #include <d3dcommon.h>
 #include <direct.h>
 #include <stdio.h>
-#include <getopt.h>
 #include <string>
 #include <wchar.h>
 
@@ -21,6 +20,29 @@ typedef HRESULT(__stdcall *pCompileFromFileg)(LPCWSTR,
 					      UINT,
 					      ID3DBlob**,
 					      ID3DBlob**);
+
+struct ProfilePrefix {
+  const char* name;
+  const char* prefix;
+};
+
+static const ProfilePrefix g_profilePrefixTable[] = {
+  { "ps_2_0", "g_ps20"},
+  { "ps_2_a", "g_ps21"},
+  { "ps_2_b", "g_ps21"},
+  { "ps_2_sw", "g_ps2ff"},
+  { "ps_3_0", "g_ps30"},
+  { "ps_3_sw", "g_ps3ff"},
+
+  { "vs_1_1", "g_vs11"},
+  { "vs_2_0", "g_vs20"},
+  { "vs_2_a", "g_vs21"},
+  { "vs_2_sw", "g_vs2ff"},
+  { "vs_3_0", "g_vs30"},
+  { "vs_3_sw", "g_vs3ff"},
+
+  { NULL, NULL}
+};
 
 void print_usage_arg() {
   // https://msdn.microsoft.com/en-us/library/windows/desktop/bb509709(v=vs.85).aspx
@@ -40,7 +62,41 @@ void print_usage_toomany() {
   exit(1);
 }
 
-int main(int argc, char* argv[])
+bool parseOpt( const char* option, int argc, const char** argv, int* index, char** argumentOption )
+{
+    assert(option != NULL);
+    if (!index || *index >= argc) {
+      return false;
+    }
+    const char* argument = argv[*index];
+    if (argument[0] == '-' || argument[0] == '/')
+      argument++;
+    else
+      return false;
+
+    size_t optionSize = strlen(option);
+    if (strncmp(argument, option, optionSize) != 0) {
+      return false;
+    }
+
+    if (argumentOption) {
+      argument += optionSize;
+      if (*argument == '\0') {
+        *index += 1;
+        if (*index >= argc) {
+          printf("Error: missing required argument for option %s\n", option);
+          return false;
+        }
+        *argumentOption = strdup(argv[*index]);
+      } else {
+        *argumentOption = strdup(argument);
+      }
+    }
+    *index += 1;
+    return true;
+}
+
+int main(int argc, const char* argv[])
 {
   // ====================================================================================
   // Process Command Line Arguments
@@ -52,114 +108,77 @@ int main(int argc, char* argv[])
   char* entryPoint = NULL;
   char* variableName = NULL;
   char* outputFile = NULL;
+  char* defineOption = NULL;
   int numDefines = 1;
   D3D_SHADER_MACRO* defines = new D3D_SHADER_MACRO[numDefines];
   defines[numDefines-1].Name = NULL;
   defines[numDefines-1].Definition = NULL;
 
-  int i, c;
-  static struct option longOptions[] =
-  {
-    /* These options set a flag. */
-    {"nologo", no_argument,       &verbose, 0},
-    {0, 0, 0, 0}
-  };
-
+  int index = 1;
   while (1) {
     D3D_SHADER_MACRO* newDefines;
 
-    int optionIndex = 0;
-    c = getopt_long_only (argc, argv, "T:E:D:V:F:",
-                     longOptions, &optionIndex);
-
     /* Detect the end of the options. */
-    if (c == -1)
+    if (index >= argc)
       break;
 
-    switch (c)
-    {
-      case 0:
-        //printf ("option -nologo (quiet)\n");
-        //Technically, this is any flag we define in longOptions
-        break;
-      case 'T':
-        model = strdup(optarg);
+    if (parseOpt("nologo", argc, argv, &index, NULL)) {
+      continue;
+    } else if (parseOpt("T", argc, argv, &index, &model)) {
+      if(verbose) {
+        printf ("option -T (Shader Model/Profile) with arg '%s'\n", model);
+      }
+        continue;
+    } else if (parseOpt("E", argc, argv, &index, &entryPoint)) {
+      if(verbose) {
+        printf ("option -E (Entry Point) with arg '%s'\n", entryPoint);
+      }
+      continue;
+    } else if (parseOpt("D", argc, argv, &index, &defineOption)) {
+      numDefines++;
+      //Copy the old array into the new array, but put the new definition at the beginning
+      newDefines = new D3D_SHADER_MACRO[numDefines];
+      for(int i=1; i<numDefines; i++)
+        newDefines[i] = defines[i-1];
+      delete[] defines;
+      defines = newDefines;
+      defines[0].Name = defineOption;
+      defines[0].Definition = "1";
+      if(verbose) {
+        printf ("option -D with arg %s\n", defineOption);
+      }
+      continue;
+    } else if (parseOpt("Vn", argc, argv, &index, &variableName)) {
+      if(verbose) {
+        printf ("option -Vn (Variable Name) with arg '%s'\n", variableName);
+      }
+      continue;
+    } else if (parseOpt("Vi", argc, argv, &index, NULL)) {
+      if(verbose) {
+        printf("option -Vi (Output include process details) acknowledged but ignored.\n");
+      }
+      continue;
+    } else if (parseOpt("Fh", argc, argv, &index, &outputFile)) {
+      if(verbose) {
+        printf ("option -Fh (Output File) with arg %s\n", outputFile);
+      }
+      continue;
+    } else if (parseOpt("?", argc, argv, &index, NULL)) {
+      print_usage_arg();
+      continue;
+    } else {
+      if (!inputFile)
+      {
+        inputFile = new wchar_t[strlen(argv[index])+1];
+        mbstowcs(inputFile, argv[index], strlen(argv[index])+1);
         if(verbose) {
-          printf ("option -T (Shader Model/Profile) with arg %s\n", optarg);
+          wprintf(L"input file: %ls\n", inputFile);
         }
-        break;
-      case 'E':
-        entryPoint = strdup(optarg);
-        if(verbose) {
-          printf ("option -E (Entry Point) with arg %s\n", optarg);
-        }
-        break;
-      case 'D':
-        numDefines++;
-        //Copy the old array into the new array, but put the new definition at the beginning
-        newDefines = new D3D_SHADER_MACRO[numDefines];
-        for(i=1; i<numDefines; i++)
-          newDefines[i] = defines[i-1];
-        delete[] defines;
-        defines = newDefines;
-        defines[0].Name = strdup(optarg);
-        defines[0].Definition = "1";
-        if(verbose) {
-          printf ("option -D with arg %s\n", optarg);
-        }
-        break;
-
-      case 'V':
-        switch(optarg[0])
-        {
-          case 'n':
-            variableName = strdup(&optarg[1]);
-            if(verbose) {
-              printf ("option -Vn (Variable Name) with arg %s\n", &optarg[1]);
-            }
-            break;
-          case 'i':
-            if(verbose) {
-              printf("option -Vi (Output include process details) acknowledged but ignored.\n");
-            }
-            break;
-          default:
-            print_usage_arg();
-            break;
-        }
-        break;
-      case 'F':
-        switch(optarg[0])
-        {
-          case 'h':
-            outputFile = strdup(&optarg[1]);
-            if(verbose) {
-              printf ("option -Fh (Output File) with arg %s\n", &optarg[1]);
-            }
-            break;
-          default:
-            print_usage_arg();
-            break;
-        }
-        break;
-
-      case '?':
-      default:
-        print_usage_arg();
-        break;
-    }
-  }
-
-  if (optind < argc) {
-    inputFile = new wchar_t[strlen(argv[optind])+1];
-    mbstowcs(inputFile, argv[optind], strlen(argv[optind])+1);
-    if(verbose) {
-      wprintf(L"input file: %ls\n", inputFile);
-    }
-
-    optind++;
-    if(optind < argc) {
-      print_usage_toomany();
+        index += 1;
+      } else {
+        print_usage_toomany();
+        return 1;
+      }
     }
   }
 
@@ -171,10 +190,21 @@ int main(int argc, char* argv[])
     print_usage_missing("entryPoint");
   if(defines == NULL)
     print_usage_missing("defines");
-  if(variableName == NULL)
-    print_usage_missing("variableName");
   if(outputFile == NULL)
     print_usage_missing("outputFile");
+
+  //Default output variable name
+  if (variableName == NULL) {
+      const char* prefix = "g";
+      for (int i = 0; g_profilePrefixTable[i].name != NULL; i++) {
+          if (strcmp(g_profilePrefixTable[i].name, model) == 0) {
+              prefix = g_profilePrefixTable[i].prefix;
+              break;
+          }
+      }
+      variableName = (char*)malloc(strlen(prefix) + strlen(entryPoint) + 2);
+      sprintf(variableName, "%s_%s", prefix, entryPoint);
+  }
 
   // ====================================================================================
   // Shader Compilation
@@ -213,7 +243,7 @@ int main(int argc, char* argv[])
     wprintf(L"\t %ls,\n", inputFile);
     
     printf("\t");
-    for(i=0; i<numDefines-1; i++)
+    for(int i=0; i<numDefines-1; i++)
       printf(" %s=%s", defines[i].Name, defines[i].Definition);
     printf(",\n");
 
@@ -283,8 +313,8 @@ int main(int argc, char* argv[])
     FILE* f;
     errno_t err = fopen_s(&f, outputFile, "w");
 
-    fprintf(f, "const signed char %s[] =\n{\n", entryPoint);
-    for (i = 0; i < len; i++) {
+    fprintf(f, "const signed char %s[] =\n{\n", variableName);
+    for (int i = 0; i < len; i++) {
      fprintf(f, "%4i", outString[i]);
      if (i != len - 1)
        fprintf(f, ",");
