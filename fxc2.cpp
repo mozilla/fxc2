@@ -171,10 +171,15 @@ int main(int argc, char* argv[])
     print_usage_missing("entryPoint");
   if(defines == NULL)
     print_usage_missing("defines");
-  if(variableName == NULL)
-    print_usage_missing("variableName");
   if(outputFile == NULL)
     print_usage_missing("outputFile");
+
+  if(variableName == NULL) {
+    variableName = new char[strlen(entryPoint)+3];
+    variableName[0] = 'g';
+    variableName[1] = '_';
+    strcpy(variableName+2, entryPoint);
+  }
 
   // ====================================================================================
   // Shader Compilation
@@ -283,7 +288,7 @@ int main(int argc, char* argv[])
     FILE* f;
     errno_t err = fopen_s(&f, outputFile, "w");
 
-    fprintf(f, "const signed char %s[] =\n{\n", entryPoint);
+    fprintf(f, "const signed char %s[] =\n{\n", variableName);
     for (i = 0; i < len; i++) {
      fprintf(f, "%4i", outString[i]);
      if (i != len - 1)
