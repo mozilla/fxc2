@@ -192,6 +192,8 @@ int main(int argc, char* argv[])
   strcpy(strrchr(dllPath, '\\') + 1, "d3dcompiler_47.dll");
   
   HMODULE h = LoadLibrary(dllPath);
+  if(h == NULL)
+    h = LoadLibrary("d3dcompiler_47.dll");
   if(h == NULL) {
     printf("Error: could not load d3dcompiler_47.dll from %s\n", dllPath);
     return 1;
